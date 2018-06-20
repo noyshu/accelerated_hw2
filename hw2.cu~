@@ -301,7 +301,7 @@ int main(int argc, char *argv[]) {
 				   update total_distance */
 
 				rate_limit_wait(&rate_limit);
-				//int img_idx = i % N_IMG_PAIRS;
+				int img_idx = i % N_IMG_PAIRS;
 				req_t_start[i] = get_time_msec();
 
 				/* TODO place memcpy's and kernels in a stream */
