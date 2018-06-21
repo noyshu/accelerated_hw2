@@ -8,7 +8,8 @@
 
 #define IMG_DIMENSION 32
 #define N_IMG_PAIRS 10000
-#define NREQUESTS 100000
+//#define NREQUESTS 100000
+#define NREQUESTS 67
 #define N_STREAMS 64
 
 typedef unsigned char uchar;
@@ -268,7 +269,7 @@ int main(int argc, char *argv[]) {
 //                            printf("i = %d, stream %d success\n",i,j);
 							total_distance += cpu_hist_distance[requestToStreamMap[j]];
 							req_t_end[requestToStreamMap[j]] = get_time_msec();
-                            printf("request number %d, ended at: %d\n",requestToStreamMap[j],req_t_end[requestToStreamMap[j]]);
+                            printf("request number %d, ended at:   %lf\n",requestToStreamMap[j],req_t_end[requestToStreamMap[j]]);
 							handledFinishedStream[j] = true;
 						}
                         if(i >= N_STREAMS && !streamChosen){ //choose the first available stream
@@ -283,7 +284,7 @@ int main(int argc, char *argv[]) {
 				handledFinishedStream[streamIndex] = false;
 				rate_limit_wait(&rate_limit);
 				req_t_start[i] = get_time_msec();
-                printf("request number %d, started at: %d\n",requestToStreamMap[j],req_t_start[i]);
+                printf("request number %d, started at: %lf \n",i,req_t_start[i]);
 				int img_idx = i % N_IMG_PAIRS;
 				
 				requestToStreamMap[streamIndex] = i;
@@ -326,6 +327,7 @@ int main(int argc, char *argv[]) {
 		double avg_latency = 0;
 		for (int i = 0; i < NREQUESTS; i++) {
 			avg_latency += (req_t_end[i] - req_t_start[i]);
+printf("request number %d:#n started at: %lf\nended at:   %lf\ntotal latency is: %lf\n",i,req_t_start[i],req_t_end[i],avg_latency);
 		}
 		avg_latency /= NREQUESTS;
 
