@@ -250,7 +250,6 @@ int main(int argc, char *argv[]) {
 		int streamIndex = 0;
 		int requestToStreamMap[N_STREAMS];
 		for(int j = 0; j < N_STREAMS ; j++){
-		    printf("created stream number %d \n",j);
 			cudaStreamCreate(&streams[j]);
 			handledFinishedStream[j] = false;
 		} 
@@ -266,19 +265,19 @@ int main(int argc, char *argv[]) {
 					for(int j = 0; j < N_STREAMS ; j++){
                         //printf("checking stream %d. handledFinishedStream[j] = %d \n",j,handledFinishedStream[j]);
 						if(i > j && (cudaStreamQuery(streams[j]) == cudaSuccess) && handledFinishedStream[j] == false){
-                            printf("i = %d, stream %d success\n",i,j);
+//                            printf("i = %d, stream %d success\n",i,j);
 							total_distance += cpu_hist_distance[requestToStreamMap[j]];
 							req_t_end[requestToStreamMap[j]] = get_time_msec();
 							handledFinishedStream[j] = true;
 						}
                         if(i >= N_STREAMS && !streamChosen){ //choose the first available stream
-                            printf("choosing stream %d \n",j);
+                            //printf("choosing stream %d \n",j);
                             streamIndex = j;
                             streamChosen = true;
                         }
 					}
 				}while(!streamChosen && i >= N_STREAMS);
-                printf("stream index is %d, i = %d \n",streamIndex,i);
+                //printf("stream index is %d, i = %d \n",streamIndex,i);
 				streamChosen = false;
 				handledFinishedStream[streamIndex] = false;
 				rate_limit_wait(&rate_limit);
@@ -288,14 +287,14 @@ int main(int argc, char *argv[]) {
 				requestToStreamMap[streamIndex] = i;
                 CUDA_CHECK(cudaMemcpyAsync(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,streams[streamIndex]));
                 CUDA_CHECK(cudaMemcpyAsync(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,streams[streamIndex])); //both on the same stream????
-                CUDA_CHECK(cudaMemcpyAsync(gpu_hist1, 0, 256 * sizeof(int),cudaMemcpyHostToDevice,streams[streamIndex]));
-                CUDA_CHECK(cudaMemcpyAsync(gpu_hist2, 0, 256 * sizeof(int),cudaMemcpyHostToDevice,streams[streamIndex]));
+                CUDA_CHECK(cudaMemsetAsync(gpu_hist1, 0, 256 * sizeof(int),streams[streamIndex]));
+                CUDA_CHECK(cudaMemsetAsync(gpu_hist2, 0, 256 * sizeof(int),streams[streamIndex]));
 				gpu_image_to_histogram<<<1, 1024,0,streams[streamIndex]>>>(gpu_image1, gpu_hist1);
 				gpu_image_to_histogram<<<1, 1024,0,streams[streamIndex]>>>(gpu_image2, gpu_hist2);
 				gpu_histogram_distance<<<1, 256,0,streams[streamIndex]>>>(gpu_hist1, gpu_hist2, gpu_hist_distance);
                 CUDA_CHECK(cudaMemcpyAsync(&(cpu_hist_distance[i]), gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost,streams[streamIndex]));
 				
-				printf("here \n");
+				//printf("here \n");
 
 				/* TODO place memcpy's and kernels in a stream */
 			}
