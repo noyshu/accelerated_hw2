@@ -1,5 +1,5 @@
 /* compile with: nvcc -O3 -maxrregcount=32 hw2.cu -o hw2 */
-
+//x
 #include <stdio.h>
 #include <sys/time.h>
 #include <unistd.h>
