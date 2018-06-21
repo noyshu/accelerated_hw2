@@ -1,0 +1,7 @@
+GPU details:
+
+gpu4, brach 16
+
+username: u_20326005
+
+password: yonyon
