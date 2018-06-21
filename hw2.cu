@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
     double load = 0;
     if (argc < 3) print_usage_and_die(argv[0]);
 
-    if        (!strcmp(argv[1], "streams")) {
+    if (!strcmp(argv[1], "streams")) {
         if (argc != 3) print_usage_and_die(argv[0]);
         mode = PROGRAM_MODE_STREAMS;
         load = atof(argv[2]);
@@ -164,8 +164,8 @@ int main(int argc, char *argv[]) {
 
     uchar *images1; /* we concatenate all images in one huge array */
     uchar *images2;
-    CUDA_CHECK( cudaHostAlloc(&images1, N_IMG_PAIRS * IMG_DIMENSION * IMG_DIMENSION, 0) );
-    CUDA_CHECK( cudaHostAlloc(&images2, N_IMG_PAIRS * IMG_DIMENSION * IMG_DIMENSION, 0) );
+    CUDA_CHECK(cudaHostAlloc(&images1, N_IMG_PAIRS * IMG_DIMENSION * IMG_DIMENSION, 0));
+    CUDA_CHECK(cudaHostAlloc(&images2, N_IMG_PAIRS * IMG_DIMENSION * IMG_DIMENSION, 0));
 
     load_image_pairs(images1, images2);
     double t_start, t_finish;
@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
     printf("\n=== CPU ===\n");
     int histogram1[256];
     int histogram2[256];
-    t_start  = get_time_msec();
+    t_start = get_time_msec();
     for (int i = 0; i < NREQUESTS; i++) {
         int img_idx = i % N_IMG_PAIRS;
         image_to_histogram(&images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], histogram1);
@@ -203,13 +203,15 @@ int main(int argc, char *argv[]) {
         t_start = get_time_msec();
         for (int i = 0; i < NREQUESTS; i++) {
             int img_idx = i % N_IMG_PAIRS;
-            cudaMemcpy(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice);
-            cudaMemcpy(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice);
+            cudaMemcpy(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION,
+                       cudaMemcpyHostToDevice);
+            cudaMemcpy(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION,
+                       cudaMemcpyHostToDevice);
             cudaMemset(gpu_hist1, 0, 256 * sizeof(int));
             cudaMemset(gpu_hist2, 0, 256 * sizeof(int));
-            gpu_image_to_histogram<<<1, 1024>>>(gpu_image1, gpu_hist1);
-            gpu_image_to_histogram<<<1, 1024>>>(gpu_image2, gpu_hist2);
-            gpu_histogram_distance<<<1, 256>>>(gpu_hist1, gpu_hist2, gpu_hist_distance);
+            gpu_image_to_histogram << < 1, 1024 >> > (gpu_image1, gpu_hist1);
+            gpu_image_to_histogram << < 1, 1024 >> > (gpu_image2, gpu_hist2);
+            gpu_histogram_distance << < 1, 256 >> > (gpu_hist1, gpu_hist2, gpu_hist_distance);
             cudaMemcpy(&cpu_hist_distance, gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost);
             total_distance += cpu_hist_distance;
         }
@@ -221,125 +223,136 @@ int main(int argc, char *argv[]) {
 
     /* now for the client-server part */
     printf("\n=== Client-Server ===\n");
-	do{
-		total_distance = 0;
-		double *req_t_start = (double *) malloc(NREQUESTS * sizeof(double));
-		memset(req_t_start, 0, NREQUESTS * sizeof(double));
+    double maxLoad = 10277;
+    for (double load = (maxLoad / 10); load <= maxLoad * 2; load += (maxLoad / 5)) {
+        do {
+            total_distance = 0;
+            double *req_t_start = (double *) malloc(NREQUESTS * sizeof(double));
+            memset(req_t_start, 0, NREQUESTS * sizeof(double));
 
-		double *req_t_end = (double *) malloc(NREQUESTS * sizeof(double));
-		memset(req_t_end, 0, NREQUESTS * sizeof(double));
+            double *req_t_end = (double *) malloc(NREQUESTS * sizeof(double));
+            memset(req_t_end, 0, NREQUESTS * sizeof(double));
 
-		struct rate_limit_t rate_limit;
-		rate_limit_init(&rate_limit, load, 0);
+            struct rate_limit_t rate_limit;
+            rate_limit_init(&rate_limit, load, 0);
 
-		/* TODO allocate / initialize memory, streams, etc... */
-		uchar *gpu_image1, *gpu_image2; 
-        int *gpu_hist1, *gpu_hist2; 
-        double *gpu_hist_distance; 
-        //double cpu_hist_distance[NREQUESTS];
-        double *cpu_hist_distance = (double *) malloc(NREQUESTS * sizeof(double));
-        memset(cpu_hist_distance, 0, NREQUESTS * sizeof(double));
+            /* TODO allocate / initialize memory, streams, etc... */
+            uchar *gpu_image1, *gpu_image2;
+            int *gpu_hist1, *gpu_hist2;
+            double *gpu_hist_distance;
+            //double cpu_hist_distance[NREQUESTS];
+            double *cpu_hist_distance = (double *) malloc(NREQUESTS * sizeof(double));
+            memset(cpu_hist_distance, 0, NREQUESTS * sizeof(double));
 
-        cudaMalloc(&gpu_image1, IMG_DIMENSION * IMG_DIMENSION);
-        cudaMalloc(&gpu_image2, IMG_DIMENSION * IMG_DIMENSION);
-        cudaMalloc(&gpu_hist1, 256 * sizeof(int));
-        cudaMalloc(&gpu_hist2, 256 * sizeof(int));
-        cudaMalloc(&gpu_hist_distance, 256 * sizeof(double));
-		cudaStream_t streams[N_STREAMS];
-		bool streamChosen = false;
-		bool  handledFinishedStream[N_STREAMS];
-		int streamIndex = 0;
-		int requestToStreamMap[N_STREAMS];
-		for(int j = 0; j < N_STREAMS ; j++){
-			cudaStreamCreate(&streams[j]);
-			handledFinishedStream[j] = false;
-		} 
-		double ti = get_time_msec();
-		if (mode == PROGRAM_MODE_STREAMS) {
-			for (int i = 0; i < NREQUESTS; i++) {
-				/* TODO query (don't block) streams for any completed requests.
-				   update req_t_end of completed requests
-				   update total_distance */
-//printf("request number is %d \n",i);
-				streamIndex = i; // before any stream finished we have N_STREAMS free streams 
-				do{ //going to busy wait until some stream is available.
-					for(int j = 0; j < N_STREAMS ; j++){
-                        //printf("checking stream %d. handledFinishedStream[j] = %d \n",j,handledFinishedStream[j]);
-						if(i > j && (cudaStreamQuery(streams[j]) == cudaSuccess) && handledFinishedStream[j] == false){
-//                            printf("i = %d, stream %d success\n",i,j);
-							total_distance += cpu_hist_distance[requestToStreamMap[j]];
-							req_t_end[requestToStreamMap[j]] = get_time_msec();
-                            printf("request number %d, ended at:   %lf\n",requestToStreamMap[j],req_t_end[requestToStreamMap[j]]);
-							handledFinishedStream[j] = true;
-						}
-                        if(i >= N_STREAMS && !streamChosen){ //choose the first available stream
-                            //printf("choosing stream %d \n",j);
-                            streamIndex = j;
-                            streamChosen = true;
+            cudaMalloc(&gpu_image1, IMG_DIMENSION * IMG_DIMENSION);
+            cudaMalloc(&gpu_image2, IMG_DIMENSION * IMG_DIMENSION);
+            cudaMalloc(&gpu_hist1, 256 * sizeof(int));
+            cudaMalloc(&gpu_hist2, 256 * sizeof(int));
+            cudaMalloc(&gpu_hist_distance, 256 * sizeof(double));
+            cudaStream_t streams[N_STREAMS];
+            bool streamChosen = false;
+            bool handledFinishedStream[N_STREAMS];
+            int streamIndex = 0;
+            int requestToStreamMap[N_STREAMS];
+            for (int j = 0; j < N_STREAMS; j++) {
+                cudaStreamCreate(&streams[j]);
+                handledFinishedStream[j] = false;
+            }
+            double ti = get_time_msec();
+            if (mode == PROGRAM_MODE_STREAMS) {
+                for (int i = 0; i < NREQUESTS; i++) {
+                    /* TODO query (don't block) streams for any completed requests.
+                       update req_t_end of completed requests
+                       update total_distance */
+                    //printf("request number is %d \n",i);
+                    streamIndex = i; // before any stream finished we have N_STREAMS free streams
+                    do { //going to busy wait until some stream is available.
+                        for (int j = 0; j < N_STREAMS; j++) {
+                            //printf("checking stream %d. handledFinishedStream[j] = %d \n",j,handledFinishedStream[j]);
+                            if (i > j && (cudaStreamQuery(streams[j]) == cudaSuccess) &&
+                                handledFinishedStream[j] == false) {
+                                //                            printf("i = %d, stream %d success\n",i,j);
+                                total_distance += cpu_hist_distance[requestToStreamMap[j]];
+                                req_t_end[requestToStreamMap[j]] = get_time_msec();
+                                //printf("request number %d, ended at:   %lf\n",requestToStreamMap[j],req_t_end[requestToStreamMap[j]]);
+                                handledFinishedStream[j] = true;
+                            }
+                            if (i >= N_STREAMS && !streamChosen) { //choose the first available stream
+                                //printf("choosing stream %d \n",j);
+                                streamIndex = j;
+                                streamChosen = true;
+                            }
                         }
-					}
-				}while(!streamChosen && i >= N_STREAMS);
+                    } while (!streamChosen && i >= N_STREAMS);
 
-                //printf("stream index is %d, i = %d \n",streamIndex,i);
-				streamChosen = false;
-				handledFinishedStream[streamIndex] = false;
-				rate_limit_wait(&rate_limit);
-				req_t_start[i] = get_time_msec();
-                printf("request number %d, started at: %lf \n",i,req_t_start[i]);
-				int img_idx = i % N_IMG_PAIRS;
-				
-				requestToStreamMap[streamIndex] = i;
-                CUDA_CHECK(cudaMemcpyAsync(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,streams[streamIndex]));
-                CUDA_CHECK(cudaMemcpyAsync(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,streams[streamIndex])); //both on the same stream????
-                CUDA_CHECK(cudaMemsetAsync(gpu_hist1, 0, 256 * sizeof(int),streams[streamIndex]));
-                CUDA_CHECK(cudaMemsetAsync(gpu_hist2, 0, 256 * sizeof(int),streams[streamIndex]));
-				gpu_image_to_histogram<<<1, 1024,0,streams[streamIndex]>>>(gpu_image1, gpu_hist1);
-				gpu_image_to_histogram<<<1, 1024,0,streams[streamIndex]>>>(gpu_image2, gpu_hist2);
-				gpu_histogram_distance<<<1, 256,0,streams[streamIndex]>>>(gpu_hist1, gpu_hist2, gpu_hist_distance);
-                CUDA_CHECK(cudaMemcpyAsync(&(cpu_hist_distance[i]), gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost,streams[streamIndex]));
-				
-				//printf("here \n");
+                    //printf("stream index is %d, i = %d \n",streamIndex,i);
+                    streamChosen = false;
+                    handledFinishedStream[streamIndex] = false;
+                    rate_limit_wait(&rate_limit);
+                    req_t_start[i] = get_time_msec();
+                    //printf("request number %d, started at: %lf \n",i,req_t_start[i]);
+                    int img_idx = i % N_IMG_PAIRS;
 
-				/* TODO place memcpy's and kernels in a stream */
-			}
+                    requestToStreamMap[streamIndex] = i;
+                    CUDA_CHECK(cudaMemcpyAsync(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION],
+                                               IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,
+                                               streams[streamIndex]));
+                    CUDA_CHECK(cudaMemcpyAsync(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION],
+                                               IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,
+                                               streams[streamIndex])); //both on the same stream????
+                    CUDA_CHECK(cudaMemsetAsync(gpu_hist1, 0, 256 * sizeof(int), streams[streamIndex]));
+                    CUDA_CHECK(cudaMemsetAsync(gpu_hist2, 0, 256 * sizeof(int), streams[streamIndex]));
+                    gpu_image_to_histogram << < 1, 1024, 0, streams[streamIndex] >> > (gpu_image1, gpu_hist1);
+                    gpu_image_to_histogram << < 1, 1024, 0, streams[streamIndex] >> > (gpu_image2, gpu_hist2);
+                    gpu_histogram_distance << < 1, 256, 0, streams[streamIndex] >> >
+                                                           (gpu_hist1, gpu_hist2, gpu_hist_distance);
+                    CUDA_CHECK(cudaMemcpyAsync(&(cpu_hist_distance[i]), gpu_hist_distance, sizeof(double),
+                                               cudaMemcpyDeviceToHost, streams[streamIndex]));
 
-            CUDA_CHECK(cudaDeviceSynchronize());
-            req_t_end[NREQUESTS] = get_time_msec(); //for the last request
-			/* TODO now make sure to wait for all streams to finish */
+                    //printf("here \n");
 
-		} else if (mode == PROGRAM_MODE_QUEUE) {
-			for (int i = 0; i < NREQUESTS; i++) {
+                    /* TODO place memcpy's and kernels in a stream */
+                }
 
-				/* TODO check producer consumer queue for any responses.
-				   don't block. if no responses are there we'll check again in the next iteration
-				   update req_t_end of completed requests 
-				   update total_distance */
+                CUDA_CHECK(cudaDeviceSynchronize());
+                req_t_end[NREQUESTS] = get_time_msec(); //for the last request
+                /* TODO now make sure to wait for all streams to finish */
 
-				rate_limit_wait(&rate_limit);
-				//int img_idx = i % N_IMG_PAIRS;
-				req_t_start[i] = get_time_msec();
+            } else if (mode == PROGRAM_MODE_QUEUE) {
+                for (int i = 0; i < NREQUESTS; i++) {
 
-				/* TODO place memcpy's and kernels in a stream */
-			}
-			/* TODO wait until you have responses for all requests */
-		} else {
-			assert(0);
-		}
-		double tf = get_time_msec();
+                    /* TODO check producer consumer queue for any responses.
+                       don't block. if no responses are there we'll check again in the next iteration
+                       update req_t_end of completed requests
+                       update total_distance */
 
-		double avg_latency = 0;
-		for (int i = 0; i < NREQUESTS; i++) {
-			avg_latency += (req_t_end[i] - req_t_start[i]);
-printf("request number %d:#n started at: %lf\nended at:   %lf\ntotal latency is: %lf\n",i,req_t_start[i],req_t_end[i],avg_latency);
-		}
-		avg_latency /= NREQUESTS;
+                    rate_limit_wait(&rate_limit);
+                    //int img_idx = i % N_IMG_PAIRS;
+                    req_t_start[i] = get_time_msec();
 
-		printf("mode = %s\n", mode == PROGRAM_MODE_STREAMS ? "streams" : "queue");
-		printf("load = %lf (req/sec)\n", load);
-		if (mode == PROGRAM_MODE_QUEUE) printf("threads = %d\n", threads_queue_mode);
-		printf("average distance between images %f\n", total_distance / NREQUESTS);
-		printf("throughput = %lf (req/sec)\n", NREQUESTS / (tf - ti) * 1e+3);
-		printf("average latency = %lf (msec)\n", avg_latency);
-	}while(0);
+                    /* TODO place memcpy's and kernels in a stream */
+                }
+                /* TODO wait until you have responses for all requests */
+            } else {
+                assert(0);
+            }
+            double tf = get_time_msec();
+
+            double avg_latency = 0;
+            for (int i = 0; i < NREQUESTS; i++) {
+                avg_latency += (req_t_end[i] - req_t_start[i]);
+                printf("request number %d:#n started at: %lf\nended at:   %lf\ntotal latency is: %lf\n", i,
+                       req_t_start[i], req_t_end[i], avg_latency);
+            }
+            avg_latency /= NREQUESTS;
+
+            printf("mode = %s\n", mode == PROGRAM_MODE_STREAMS ? "streams" : "queue");
+            printf("load = %lf (req/sec)\n", load);
+            if (mode == PROGRAM_MODE_QUEUE) printf("threads = %d\n", threads_queue_mode);
+            printf("average distance between images %f\n", total_distance / NREQUESTS);
+            printf("throughput = %lf (req/sec)\n", NREQUESTS / (tf - ti) * 1e+3);
+            printf("average latency = %lf (msec)\n", avg_latency);
+        } while (0);
+    }
     return 0;
 }
