@@ -185,38 +185,38 @@ int main(int argc, char *argv[]) {
 //    printf("average distance between images %f\n", total_distance / NREQUESTS);
 //    printf("throughput = %lf (req/sec)\n", NREQUESTS / (t_finish - t_start) * 1e+3);
 //
-//    /* using GPU task-serial.. just to verify the GPU code makes sense */
-//    printf("\n=== GPU Task Serial ===\n");
-//    do {
-//        uchar *gpu_image1, *gpu_image2; // TODO: allocate with cudaMalloc
-//        int *gpu_hist1, *gpu_hist2; // TODO: allocate with cudaMalloc
-//        double *gpu_hist_distance; //TODO: allocate with cudaMalloc
-//        double cpu_hist_distance;
-//        cudaMalloc(&gpu_image1, IMG_DIMENSION * IMG_DIMENSION); 
-//        cudaMalloc(&gpu_image2, IMG_DIMENSION * IMG_DIMENSION);
-//        cudaMalloc(&gpu_hist1, 256 * sizeof(int));
-//        cudaMalloc(&gpu_hist2, 256 * sizeof(int));
-//        cudaMalloc(&gpu_hist_distance, 256 * sizeof(double));
-//
-//        total_distance = 0;
-//        t_start = get_time_msec();
-//        for (int i = 0; i < NREQUESTS; i++) {
-//            int img_idx = i % N_IMG_PAIRS;
-//            cudaMemcpy(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice);
-//            cudaMemcpy(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice);
-//            cudaMemset(gpu_hist1, 0, 256 * sizeof(int));
-//            cudaMemset(gpu_hist2, 0, 256 * sizeof(int));
-//            gpu_image_to_histogram<<<1, 1024>>>(gpu_image1, gpu_hist1);
-//            gpu_image_to_histogram<<<1, 1024>>>(gpu_image2, gpu_hist2);
-//            gpu_histogram_distance<<<1, 256>>>(gpu_hist1, gpu_hist2, gpu_hist_distance);
-//            cudaMemcpy(&cpu_hist_distance, gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost);
-//            total_distance += cpu_hist_distance;
-//        }
-//        CUDA_CHECK(cudaDeviceSynchronize());
-//        t_finish = get_time_msec();
-//        printf("average distance between images %f\n", total_distance / NREQUESTS);
-//        printf("throughput = %lf (req/sec)\n", NREQUESTS / (t_finish - t_start) * 1e+3);
-//    } while (0);
+    /* using GPU task-serial.. just to verify the GPU code makes sense */
+    printf("\n=== GPU Task Serial ===\n");
+    do {
+        uchar *gpu_image1, *gpu_image2; // TODO: allocate with cudaMalloc
+        int *gpu_hist1, *gpu_hist2; // TODO: allocate with cudaMalloc
+        double *gpu_hist_distance; //TODO: allocate with cudaMalloc
+        double cpu_hist_distance;
+        cudaMalloc(&gpu_image1, IMG_DIMENSION * IMG_DIMENSION);
+        cudaMalloc(&gpu_image2, IMG_DIMENSION * IMG_DIMENSION);
+        cudaMalloc(&gpu_hist1, 256 * sizeof(int));
+        cudaMalloc(&gpu_hist2, 256 * sizeof(int));
+        cudaMalloc(&gpu_hist_distance, 256 * sizeof(double));
+
+        total_distance = 0;
+        t_start = get_time_msec();
+        for (int i = 0; i < NREQUESTS; i++) {
+            int img_idx = i % N_IMG_PAIRS;
+            cudaMemcpy(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice);
+            cudaMemcpy(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice);
+            cudaMemset(gpu_hist1, 0, 256 * sizeof(int));
+            cudaMemset(gpu_hist2, 0, 256 * sizeof(int));
+            gpu_image_to_histogram<<<1, 1024>>>(gpu_image1, gpu_hist1);
+            gpu_image_to_histogram<<<1, 1024>>>(gpu_image2, gpu_hist2);
+            gpu_histogram_distance<<<1, 256>>>(gpu_hist1, gpu_hist2, gpu_hist_distance);
+            cudaMemcpy(&cpu_hist_distance, gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost);
+            total_distance += cpu_hist_distance;
+        }
+        CUDA_CHECK(cudaDeviceSynchronize());
+        t_finish = get_time_msec();
+        printf("average distance between images %f\n", total_distance / NREQUESTS);
+        printf("throughput = %lf (req/sec)\n", NREQUESTS / (t_finish - t_start) * 1e+3);
+    } while (0);
 
     /* now for the client-server part */
     printf("\n=== Client-Server ===\n");
