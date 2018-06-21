@@ -286,20 +286,20 @@ int main(int argc, char *argv[]) {
 				int img_idx = i % N_IMG_PAIRS;
 				
 				requestToStreamMap[streamIndex] = i;
-				cudaMemcpyAsync(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,streams[streamIndex]);
-				cudaMemcpyAsync(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,streams[streamIndex]); //both on the same stream????
-				cudaMemcpyAsync(gpu_hist1, 0, 256 * sizeof(int),cudaMemcpyHostToDevice,streams[streamIndex]);
-				cudaMemcpyAsync(gpu_hist2, 0, 256 * sizeof(int),cudaMemcpyHostToDevice,streams[streamIndex]);
+                CUDA_CHECK(cudaMemcpyAsync(gpu_image1, &images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,streams[streamIndex]));
+                CUDA_CHECK(cudaMemcpyAsync(gpu_image2, &images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], IMG_DIMENSION * IMG_DIMENSION, cudaMemcpyHostToDevice,streams[streamIndex])); //both on the same stream????
+                CUDA_CHECK(cudaMemcpyAsync(gpu_hist1, 0, 256 * sizeof(int),cudaMemcpyHostToDevice,streams[streamIndex]));
+                CUDA_CHECK(cudaMemcpyAsync(gpu_hist2, 0, 256 * sizeof(int),cudaMemcpyHostToDevice,streams[streamIndex]));
 				gpu_image_to_histogram<<<1, 1024,0,streams[streamIndex]>>>(gpu_image1, gpu_hist1);
 				gpu_image_to_histogram<<<1, 1024,0,streams[streamIndex]>>>(gpu_image2, gpu_hist2);
 				gpu_histogram_distance<<<1, 256,0,streams[streamIndex]>>>(gpu_hist1, gpu_hist2, gpu_hist_distance);
-				cudaMemcpyAsync(&(cpu_hist_distance[i]), gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost,streams[streamIndex]);
+                CUDA_CHECK(cudaMemcpyAsync(&(cpu_hist_distance[i]), gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost,streams[streamIndex]));
 				
 				printf("here \n");
 
 				/* TODO place memcpy's and kernels in a stream */
 			}
-
+            CUDA_CHECK(cudaDeviceSynchronize());
 			/* TODO now make sure to wait for all streams to finish */
 
 		} else if (mode == PROGRAM_MODE_QUEUE) {
