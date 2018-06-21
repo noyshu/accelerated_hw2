@@ -279,6 +279,7 @@ int main(int argc, char *argv[]) {
                         }
 					}
 				}while(!streamChosen && i >= N_STREAMS);
+
                 //printf("stream index is %d, i = %d \n",streamIndex,i);
 				streamChosen = false;
 				handledFinishedStream[streamIndex] = false;
@@ -301,7 +302,9 @@ int main(int argc, char *argv[]) {
 
 				/* TODO place memcpy's and kernels in a stream */
 			}
+
             CUDA_CHECK(cudaDeviceSynchronize());
+            req_t_end[NREQUESTS] = get_time_msec(); //for the last request
 			/* TODO now make sure to wait for all streams to finish */
 
 		} else if (mode == PROGRAM_MODE_QUEUE) {
