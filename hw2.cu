@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
     /* now for the client-server part */
     printf("\n=== Client-Server ===\n");
     double maxLoad = 10277;
-    for (double load = (maxLoad / 10); load <= maxLoad * 2; load += (maxLoad / 5)) {
+    for ( load = (maxLoad / 10); load <= maxLoad * 2; load += (maxLoad / 5)) {
         do {
             total_distance = 0;
             double *req_t_start = (double *) malloc(NREQUESTS * sizeof(double));
@@ -315,7 +315,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 CUDA_CHECK(cudaDeviceSynchronize());
-                req_t_end[NREQUESTS] = get_time_msec(); //for the last request
+                req_t_end[NREQUESTS-1] = get_time_msec(); //for the last request
                 /* TODO now make sure to wait for all streams to finish */
 
             } else if (mode == PROGRAM_MODE_QUEUE) {
@@ -341,8 +341,8 @@ int main(int argc, char *argv[]) {
             double avg_latency = 0;
             for (int i = 0; i < NREQUESTS; i++) {
                 avg_latency += (req_t_end[i] - req_t_start[i]);
-                printf("request number %d:#n started at: %lf\nended at:   %lf\ntotal latency is: %lf\n", i,
-                       req_t_start[i], req_t_end[i], avg_latency);
+                //printf("request number %d:#n started at: %lf\nended at:   %lf\ntotal latency is: %lf\n", i,
+                 //      req_t_start[i], req_t_end[i], avg_latency);
             }
             avg_latency /= NREQUESTS;
 
