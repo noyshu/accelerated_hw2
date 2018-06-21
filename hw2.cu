@@ -261,13 +261,13 @@ int main(int argc, char *argv[]) {
 				   update req_t_end of completed requests
 				   update total_distance */
 //printf("request number is %d \n",i);
-				streamIndex = i; // before any stream finished we haveN_STREAMS free streams 
+				streamIndex = i; // before any stream finished we have N_STREAMS free streams 
 				do{ //going to busy wait until some stream is available.
 					for(int j = 0; j < N_STREAMS ; j++){
-                        printf("checking stream %d. handledFinishedStream[j] = %d \n",j,handledFinishedStream[j]);
+                        //printf("checking stream %d. handledFinishedStream[j] = %d \n",j,handledFinishedStream[j]);
 						if(i > j && (cudaStreamQuery(streams[j]) == cudaSuccess) && handledFinishedStream[j] == false){
                             printf("i = %d, stream %d success\n",i,j);
-							total_distance += cpu_hist_distance[j];
+							total_distance += cpu_hist_distance[requestToStreamMap[j]];
 							req_t_end[requestToStreamMap[j]] = get_time_msec();
 							handledFinishedStream[j] = true;
 						}
@@ -293,12 +293,13 @@ int main(int argc, char *argv[]) {
 				gpu_image_to_histogram<<<1, 1024,0,streams[streamIndex]>>>(gpu_image1, gpu_hist1);
 				gpu_image_to_histogram<<<1, 1024,0,streams[streamIndex]>>>(gpu_image2, gpu_hist2);
 				gpu_histogram_distance<<<1, 256,0,streams[streamIndex]>>>(gpu_hist1, gpu_hist2, gpu_hist_distance);
-				cudaMemcpyAsync(&(cpu_hist_distance[streamIndex]), gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost,streams[streamIndex]);
+				cudaMemcpyAsync(&(cpu_hist_distance[i]), gpu_hist_distance, sizeof(double), cudaMemcpyDeviceToHost,streams[streamIndex]);
 				
 				printf("here \n");
 
 				/* TODO place memcpy's and kernels in a stream */
 			}
+
 			/* TODO now make sure to wait for all streams to finish */
 
 		} else if (mode == PROGRAM_MODE_QUEUE) {
