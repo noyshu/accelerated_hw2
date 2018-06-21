@@ -250,7 +250,7 @@ int main(int argc, char *argv[]) {
 		int streamIndex = 0;
 		int requestToStreamMap[N_STREAMS];
 		for(int j = 0; j < N_STREAMS ; j++){
-printf("created stream number %d \n",j);
+		    printf("created stream number %d \n",j);
 			cudaStreamCreate(&streams[j]);
 			handledFinishedStream[j] = false;
 		} 
@@ -264,22 +264,21 @@ printf("created stream number %d \n",j);
 				streamIndex = i; // before any stream finished we haveN_STREAMS free streams 
 				do{ //going to busy wait until some stream is available.
 					for(int j = 0; j < N_STREAMS ; j++){
-printf("checking stream %d. handledFinishedStream[j] = %d \n",j,handledFinishedStream[j]);
+                        printf("checking stream %d. handledFinishedStream[j] = %d \n",j,handledFinishedStream[j]);
 						if(i > j && (cudaStreamQuery(streams[j]) == cudaSuccess) && handledFinishedStream[j] == false){
-printf("i = %d, stream %d success\n",i,j);
+                            printf("i = %d, stream %d success\n",i,j);
 							total_distance += cpu_hist_distance[j];
 							req_t_end[requestToStreamMap[j]] = get_time_msec();
 							handledFinishedStream[j] = true;
-							if(i >= N_STREAMS && !streamChosen){ //choose the first available stream
-printf("choosing stream %d \n",j);
-								streamIndex = j;
-								streamChosen = true;
-							}
 						}
-
+                        if(i >= N_STREAMS && !streamChosen){ //choose the first available stream
+                            printf("choosing stream %d \n",j);
+                            streamIndex = j;
+                            streamChosen = true;
+                        }
 					}
 				}while(!streamChosen && i >= N_STREAMS);
-printf("stream index is %d, i = %d \n",streamIndex,i);
+                printf("stream index is %d, i = %d \n",streamIndex,i);
 				streamChosen = false;
 				handledFinishedStream[streamIndex] = false;
 				rate_limit_wait(&rate_limit);
