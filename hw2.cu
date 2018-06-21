@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
     CUDA_CHECK( cudaHostAlloc(&images2, N_IMG_PAIRS * IMG_DIMENSION * IMG_DIMENSION, 0) );
 
     load_image_pairs(images1, images2);
-    //double t_start, t_finish;w
+    double t_start, t_finish;
     double total_distance;
 
     /* using CPU */
@@ -264,6 +264,7 @@ printf("created stream number %d \n",j);
 				streamIndex = i; // before any stream finished we haveN_STREAMS free streams 
 				do{ //going to busy wait until some stream is available.
 					for(int j = 0; j < N_STREAMS ; j++){
+printf("checking stream %d. handledFinishedStream[j] = %d \n",j,handledFinishedStream[j]);
 						if(i > j && (cudaStreamQuery(streams[j]) == cudaSuccess) && handledFinishedStream[j] == false){
 printf("i = %d, stream %d success\n",i,j);
 							total_distance += cpu_hist_distance[j];
@@ -275,6 +276,7 @@ printf("choosing stream %d \n",j);
 								streamChosen = true;
 							}
 						}
+
 					}
 				}while(!streamChosen && i >= N_STREAMS);
 printf("stream index is %d, i = %d \n",streamIndex,i);
