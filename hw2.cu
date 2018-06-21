@@ -169,22 +169,22 @@ int main(int argc, char *argv[]) {
     load_image_pairs(images1, images2);
     //double t_start, t_finish;w
     double total_distance;
-//
-//    /* using CPU */
-//    printf("\n=== CPU ===\n");
-//    int histogram1[256];
-//    int histogram2[256];
-//    t_start  = get_time_msec();
-//    for (int i = 0; i < NREQUESTS; i++) {
-//        int img_idx = i % N_IMG_PAIRS;
-//        image_to_histogram(&images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], histogram1);
-//        image_to_histogram(&images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], histogram2);
-//        total_distance += histogram_distance(histogram1, histogram2);
-//    }
-//    t_finish = get_time_msec();
-//    printf("average distance between images %f\n", total_distance / NREQUESTS);
-//    printf("throughput = %lf (req/sec)\n", NREQUESTS / (t_finish - t_start) * 1e+3);
-//
+
+    /* using CPU */
+    printf("\n=== CPU ===\n");
+    int histogram1[256];
+    int histogram2[256];
+    t_start  = get_time_msec();
+    for (int i = 0; i < NREQUESTS; i++) {
+        int img_idx = i % N_IMG_PAIRS;
+        image_to_histogram(&images1[img_idx * IMG_DIMENSION * IMG_DIMENSION], histogram1);
+        image_to_histogram(&images2[img_idx * IMG_DIMENSION * IMG_DIMENSION], histogram2);
+        total_distance += histogram_distance(histogram1, histogram2);
+    }
+    t_finish = get_time_msec();
+    printf("average distance between images %f\n", total_distance / NREQUESTS);
+    printf("throughput = %lf (req/sec)\n", NREQUESTS / (t_finish - t_start) * 1e+3);
+
     /* using GPU task-serial.. just to verify the GPU code makes sense */
     printf("\n=== GPU Task Serial ===\n");
     do {
