@@ -568,7 +568,7 @@ int main(int argc, char *argv[]) {
 		
     } else if (mode == PROGRAM_MODE_QUEUE) {
 		int threadBlocks = getNumOfThreadBlocks(threads_queue_mode);
-		//printf("threadBlocks = %d",threadBlocks);
+		printf("threadBlocks = %d",threadBlocks);
 		gpu2cpuQueue **cpu_gpu2cpus, **gpu_gpu2cpus;
 		cpu2gpuQueue **cpu_cpu2gpus, **gpu_cpu2gpus;
 		
@@ -646,7 +646,7 @@ int main(int argc, char *argv[]) {
     }
     avg_latency /= NREQUESTS;
 
-	printf("thread blocks %d",threadBlocks);
+
     printf("mode = %s\n", mode == PROGRAM_MODE_STREAMS ? "streams" : "queue");
     printf("load = %lf (req/sec)\n", load);
     if (mode == PROGRAM_MODE_QUEUE) printf("threads = %d\n", threads_queue_mode);
